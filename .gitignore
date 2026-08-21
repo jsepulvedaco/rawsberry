@@ -16,3 +16,5 @@ out/
 *.DNG
 
 .DS_Store
+
+.claude/
