@@ -6,7 +6,9 @@ The goal is not to make editing faster. It is to remove the step.
 
 ## Status
 
-Design phase complete. **No working pipeline yet.** Phase 1 is in progress.
+Design phase complete. **No pipeline code written yet.**
+
+The Pi 5 is provisioned and the end-to-end render path has been verified on-device — RawTherapee reads a CR2 and writes a JPEG on target hardware, with and without a profile. That is a readiness check, not a measurement; nothing yet moves the four numbers below. Phase 1, the verdict → mapper → `.pp3` loop, is the next work and has not started.
 
 One pilot has been run outside the target architecture (a vision model emitting RawTherapee profiles directly). On three photographs the camera's own JPEG was preferred on two of them. That result is why the architecture below exists in the form it does, and it is recorded here rather than omitted.
 
@@ -71,6 +73,56 @@ These algorithms are not reimplemented. A from-scratch tone/colour/denoise stack
 - No screen, no keyboard — the phone is the entire UI, over a browser
 
 No accelerator. Local semantic inference ranks below power-bank operation, and the two pull against each other.
+
+## Pi setup
+
+### Before first boot — Raspberry Pi Imager
+
+Raspberry Pi Imager's "Would you like to apply OS customisation settings?" dialog **defaults to No**. Clicking through it silently discards hostname, user account, SSH enable and Wi-Fi credentials, producing a Pi that boots normally and is completely unreachable. The failure presents as a network problem, which makes it slow to diagnose.
+
+Apply customisation and set: hostname, user account, SSH enable, Wi-Fi credentials. These are pre-boot settings and cannot be scripted.
+
+To confirm it worked, mount the boot partition and look for `custom.toml`. If it is absent, nothing was applied.
+
+Recovery without re-flashing, on the boot partition:
+
+- `touch ssh` — enables the SSH server
+- `userconf.txt` containing `user:<hash from openssl passwd -6>` — creates the account
+
+### Provisioning
+
+Everything after first boot is scripted. On the Pi:
+
+```bash
+./setup.sh
+```
+
+Sets Wi-Fi regulatory domain, timezone and locale, then installs `git`, `tmux` and `rawtherapee`.
+
+Locale is set to `C.UTF-8` in `/etc/default/locale` deliberately: a locale using decimal commas would corrupt float values written into `.pp3` files, and `/etc/default/locale` is inherited by systemd units and non-interactive processes, which `profile.d` would not cover.
+
+### GitHub access
+
+The Pi pulls from GitHub using a **repo-scoped deploy key**, not an account SSH key. A deploy key grants access to this repository only — if the Pi is lost or compromised, the blast radius is one repo, and it can be revoked from the repo's own settings page.
+
+Generate on the Pi:
+
+```bash
+ssh-keygen -t ed25519 -C "raspberrypi"
+cat ~/.ssh/id_ed25519.pub
+```
+
+Add at: repo → Settings → Deploy keys → Add deploy key. Leave "Allow write access" unchecked — the Pi only pulls.
+
+Clone:
+
+```bash
+git clone git@github.com:jsepulvedaco/edge-raw-jpeg.git
+```
+
+Deploy step is `git pull`. Development happens on the laptop; the Pi never pushes.
+
+Note: a deploy key is valid for one repository only. A second repo needs its own key.
 
 ## Evaluation
 
