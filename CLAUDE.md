@@ -15,6 +15,93 @@
 
 ---
 
+# Working context
+
+What is being built, as opposed to the constraints below on what may not be.
+
+## Pipeline
+
+```
+SD card → phone web UI → SettingsPicker → deterministic mapper → .pp3 → rawtherapee-cli → JPEG → feedback log
+```
+
+`SettingsPicker` is one interface — standardized preview + allowlisted features in, the frozen 8
+verdicts out. V1 (heuristic tree), V2 (VLM, hosted or local), V3 (trained classifier) are
+implementations of it, not layers. Nothing downstream knows which one answered.
+
+## Stack
+
+- **Backend:** FastAPI + async job queue. A 30-photo selection cannot be request-response.
+- **Frontend:** React, phone-first, browser only. No app, no pairing, no Bluetooth.
+- **Pipeline:** Python orchestration. `rawpy` for RAW statistics and measurement **only** —
+  never for the production render. `configparser` for `.pp3`. OpenCV is Phase 6 only.
+- **State:** filesystem. No database.
+
+## Phase
+
+**Phase 1, not started.** Design is done; there are zero lines of pipeline code. The next action is
+the bootstrap loop — V1 verdicts → mapper → generated `.pp3` → `rawtherapee-cli` → JPEG, with
+**guessed** constants. Calibration is separate work and is not in the build order.
+
+Gating it: confirm what `InputProfile` RawTherapee actually resolves, then the `ai-pp3` smoke test.
+*(RawTherapee's licence version is not a gate — subprocess invocation is not linking. `ai-pp3` is
+GPL-2.0 and is read, never copied.)*
+
+One pilot ran Aug 12–13 2026 outside this architecture and lost to the camera JPEG on two of three
+photographs. That result is why the architecture has its current shape.
+
+## Verdict schema
+
+The contract. Do not invent values outside these vocabularies.
+
+```json
+{
+  "brightness":          "increase | keep | decrease",
+  "shadows":             "lift | keep | deepen",
+  "highlights":          "recover | keep",
+  "white_balance":       "neutralize | preserve_warm | preserve_cool",
+  "contrast":            "increase | keep | reduce",
+  "detail_preservation": "preserve | balanced | smooth",
+  "saturation":          "vivid | natural | muted",
+  "tone_profile":        "neutral | punchy | soft"
+}
+```
+
+## Validation and degradation
+
+- **Clamp every mapped value to a safe range.** Model says +3.0 EV → cap at ±1.5.
+- **Malformed or missing fields → retry, then fall back to V1.** Never propagate a bad parse.
+- **The system never fails to produce a JPEG.** It produces a dumber one. This is priority #4
+  made executable.
+
+## Originals are read-only
+
+`raws/` is input. Never write, move, rename or re-encode anything in it. Output goes to `out/`.
+
+## `neutral.pp3` is a reproducibility anchor
+
+The standardized preview profile must be a versioned file in this repo, not a description. Eval
+runs are only comparable if every preview was generated identically.
+
+**Unclosed defects:**
+
+- `ApplyLookTable`, `ApplyHueSatMap` and `HLRecovery` disagree between `neutral.pp3` and the render
+  template — reconcile before the next pilot round.
+- **`[Resize]` is absent**, so previews render full-resolution. "Fixed resize and normalization,
+  identical for every camera" is specified but not implemented.
+- **`ImageNum=1`** where RT's default is `0` and the field is zero-indexed. Unverified. Test:
+  render with `ImageNum=0` and compare md5 — identical means harmless, different means every render
+  from this template is suspect.
+
+## V3 label strength (constrains the Phase 4 log schema, not just Phase 5)
+
+An accept does not prove all eight verdicts were right. Accepted images give **weak pseudo-labels**;
+only explicitly corrected dimensions give **strong labels**. Train with per-output masks so a
+white-balance correction cannot promote seven unreviewed predictions to ground truth. Design the
+log for this from day one.
+
+---
+
 # Project constraints
 
 Distilled from the design note. Source of truth for *why* is the Notion page; this file is the
@@ -145,6 +232,11 @@ of verdict quality.
 - **No fixed-function ISP on the production render.** PiSP is preview-path only, if at all.
 - **`ai-pp3` is read, never imported.** GPL-2.0-only would foreclose permissive relicensing.
   Calling `rawtherapee-cli` via subprocess is not linking and constrains nothing.
+- **Pin the renderer version.** Desktop and Pi must run the same RawTherapee build. Determinism is
+  specified against a *pinned renderer build*; two versions means eval measures a proxy. Currently
+  **5.10 desktop / 5.11 Pi — unresolved**, and `setup.sh` does a bare `apt install rawtherapee`,
+  which will keep them drifting. `neutral.pp3` declares `AppVersion=5.10`; regenerate it from
+  whichever version wins.
 
 ## Hardware and concurrency
 
@@ -152,6 +244,10 @@ of verdict quality.
   **closed** — it buys 22–29%, minutes on a full card. Do not reopen without a new argument.
 - Leading configuration: **1 process × 4 threads, `RgbDenoiseThreadLimit=0`.** Desktop-measured;
   the Pi decides.
+- **Two operating modes, both producing byte-identical JPEGs.** Field (default, power-bank): 1×2,
+  9.10 s/photo, conservative governor. Bench (mains): 1×4, 6.72 s/photo. **Justify the modes on
+  peak current, not on speed** — the gap is ~1.3×, not the ~3× once claimed. If the Phase 3 power
+  test shows no meaningful peak-draw difference, collapsing to one mode is the right call.
 - **No hardcoded hardware configuration.** Per-process memory varies with megapixels and profile.
   Probe the first render, read actual peak RSS, size workers from the remaining budget.
 - **Probe at the thread count the workers will actually use.** Denoise threads cost ~317MB each.
@@ -201,3 +297,11 @@ that.
 - **`ai-pp3` as Baseline A** in the Phase 4 blind comparison.
 - **`ApplyHueSatMap` classification** — probably calibration, not aesthetic. Currently disabled on
   the aesthetic reading.
+- **What "neutral" means — one question with four faces.** `InputProfile` is absent from
+  `neutral.pp3`, so RT resolves a default (believed to be the camera-matched DCP; unverified, an
+  `-O` dump settles it). Note that per-camera *calibration* applied deterministically is the
+  invariant working, **not** violating it — a single fixed matrix across sensors makes camera
+  identity more visible, per the Aug 13 correction. So the open question is not "remove the camera
+  dependence" but "which parts of the DCP are calibration and which are aesthetic." That is the same
+  question as `ApplyHueSatMap`, as `ApplyBaselineExposureOffset=true`, and as `Setting=Camera`. One
+  coherent answer should settle all four. Not resolved as of Aug 21 2026.
