@@ -176,4 +176,6 @@ Explicitly out of scope: cropping, astrophotography, arbitrary masking.
 
 ## License
 
-Not yet chosen. RawTherapee is invoked as a subprocess, which is not linking, so its license places no constraint on this repository.
+MIT. See [LICENSE](LICENSE).
+
+RawTherapee is invoked as a subprocess, which is not linking, so its license places no constraint on this repository.
