@@ -1,4 +1,4 @@
-# edge-raw-jpeg
+# rawsberry
 
 A portable edge appliance that turns a camera SD card into finished JPEGs with zero manual editing. Insert card, select photos from a phone, walk away.
 
