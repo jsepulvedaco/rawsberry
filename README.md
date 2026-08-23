@@ -97,9 +97,28 @@ Everything after first boot is scripted. On the Pi:
 ./setup.sh
 ```
 
-Sets Wi-Fi regulatory domain, timezone and locale, then installs `git`, `tmux` and `rawtherapee`.
+Sets Wi-Fi regulatory domain, timezone and locale, installs `git`, `tmux` and `curl`, then installs the pinned RawTherapee build described below. Re-running is safe: the renderer step is skipped once installed, and every other step rewrites the same values.
 
 Locale is set to `C.UTF-8` in `/etc/default/locale` deliberately: a locale using decimal commas would corrupt float values written into `.pp3` files, and `/etc/default/locale` is inherited by systemd units and non-interactive processes, which `profile.d` would not cover.
+
+### Renderer pin
+
+Both machines run **RawTherapee 5.13**, installed from the official upstream **Linux** AppImage rather than from apt. 5.13 is the first release with an official arm64 Linux build, so the Linux desktop and the Pi can run the same upstream binary; `apt install rawtherapee` gave 5.10 on the desktop and 5.11 on the Pi and would have kept drifting.
+
+This matters because determinism is specified against a *pinned renderer build*. Two versions means the eval harness measures a proxy, and numbers taken on one build are not comparable with numbers taken on the other.
+
+Both assets below are Linux-only builds, from `https://github.com/RawTherapee/RawTherapee/releases/tag/5.13`:
+
+| Target | Asset | sha256 |
+| --- | --- | --- |
+| Pi, Linux arm64 | `RawTherapee_5.13_arm64_release.AppImage` | `9e424633272a49bb47afe4bf065604858acf9de77c4d80e0f6557024492e2b55` |
+| Desktop, Linux x86_64 | `RawTherapee_5.13_x86_64_release.AppImage` | `746a3509a234804c3a5f66649006ac29ac67f193a8559d2297357949a890b097` |
+
+`setup.sh` fetches the arm64 asset and verifies it against the hash above before installing, aborting if they differ. The desktop side is currently installed by hand from the same release.
+
+A release asset can be rebuilt and re-uploaded under the same tag, so a working URL does not imply the pinned bytes — that is what the checksum catches. If it ever fails, compare the reported hash against the checksum published on the release page. If they differ, the download was corrupt; re-run. If they match, upstream replaced the asset: do not simply update the constant, because different bytes mean a different renderer, and `neutral.pp3` must be regenerated with every prior eval number treated as no longer comparable.
+
+AppImages are extracted with `--appimage-extract` rather than run through FUSE, since Pi OS Lite ships no `libfuse2`.
 
 ### GitHub access
 
