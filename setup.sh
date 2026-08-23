@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# setup.sh — Provision a fresh Raspberry Pi 5 for the edge-raw-jpeg appliance.
+# setup.sh — Provision a fresh Raspberry Pi 5 for the rawsberry appliance.
 #
 # Assumes: Raspberry Pi OS Lite (64-bit) already flashed, SSH working,
 #          network reachable. Run once on a fresh card.
@@ -55,4 +55,4 @@ echo "       ssh-keygen -t ed25519 -C \"raspberrypi\""
 echo "       cat ~/.ssh/id_ed25519.pub"
 echo "     Add at: repo -> Settings -> Deploy keys (read-only)"
 echo "  2. Clone:"
-echo "       git clone git@github.com:jsepulvedaco/edge-raw-jpeg.git"
+echo "       git clone git@github.com:jsepulvedaco/rawsberry.git"

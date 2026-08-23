@@ -117,7 +117,7 @@ Add at: repo → Settings → Deploy keys → Add deploy key. Leave "Allow write
 Clone:
 
 ```bash
-git clone git@github.com:jsepulvedaco/edge-raw-jpeg.git
+git clone git@github.com:jsepulvedaco/rawsberry.git
 ```
 
 Deploy step is `git pull`. Development happens on the laptop; the Pi never pushes.
