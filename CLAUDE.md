@@ -1,5 +1,23 @@
 # CLAUDE.md
 
+## Backlog
+
+Open work lives in the Notion Backlog database, not in prose pages or repo files.
+
+- **Before starting a task, move its card to `In progress`.** If no card exists, create one.
+- **When it is finished, move it to `Done`.** Check this at the end of every task.
+- Keep one card per unit of work; do not track the same work in both Notion and the repo.
+
+## Decision log
+
+- **Summarize.** One dense paragraph: the decision, the mechanism, the consequence.
+- No housekeeping — files deleted, commits made, sections moved, work performed.
+
+## End of a session
+
+Before wrapping up a working session or discussion, ask whether anything needs adding to the
+Backlog or the Decision Log.
+
 ## Git
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages:
