@@ -13,6 +13,16 @@ Open work lives in the Notion Backlog database, not in prose pages or repo files
 - **Summarize.** One dense paragraph: the decision, the mechanism, the consequence.
 - No housekeeping — files deleted, commits made, sections moved, work performed.
 
+## Repo files carry current state only
+
+This file and the README describe the project as it is now, for a reader with no history. History
+lives in git and the Decision Log.
+
+- No dates, no retractions, no "replaces", "once claimed", "per the X correction", "closed by".
+- Epistemic labels about *now* stay: measured, guessed, provisional, blocked, open.
+- Test per sentence: if the reader never saw an earlier version of this file, does the sentence
+  still carry information? If not, delete it.
+
 ## End of a session
 
 Before wrapping up a working session or discussion, ask whether anything needs adding to the
@@ -45,24 +55,43 @@ implementations of it, not layers. Nothing downstream knows which one answered.
 
 - **Backend:** FastAPI + async job queue. A 30-photo selection cannot be request-response.
 - **Frontend:** React, phone-first, browser only. No app, no pairing, no Bluetooth.
-- **Pipeline:** Python orchestration. `rawpy` for RAW statistics and measurement **only** —
+- **Pipeline:** Python 3.11+ orchestration. `rawpy` for RAW statistics and measurement **only** —
   never for the production render. `configparser` for `.pp3`. OpenCV is Phase 6 only.
 - **State:** filesystem. No database.
+- **Renderer:** RawTherapee 5.13 AppImage extracted to `/opt/rawtherapee-5.13` on desktop and Pi
+  alike; `rawtherapee-cli` is on `PATH`.
+- **Development camera:** Canon EOS 2000D, CR2. The only body anything has been measured on.
+  "This body" anywhere in this file means the 2000D.
 
 ## Phase
 
-**Phase 1, not started.** Design is done; there are zero lines of pipeline code. The next action is
-the bootstrap loop — V1 verdicts → mapper → generated `.pp3` → `rawtherapee-cli` → JPEG, with
-**guessed** constants. Calibration is separate work and is not in the build order.
+**Phase 1, not started.** Design is done; there are zero lines of pipeline code. Nothing remains
+before code. The next action is the bootstrap loop — V1 verdicts → mapper → generated `.pp3` →
+`rawtherapee-cli` → JPEG, with **guessed** constants. Calibration is separate work and is not in
+the build order.
 
-**Gate cleared Aug 23 2026** — the `InputProfile` question is measured and closed (see
-`neutral.pp3` below). The `ai-pp3` smoke test is **not** a gate: moved to Phase 4 preparation
-Aug 20 2026, run right before the blind harness. *(RawTherapee's licence version is not a gate
-either — subprocess invocation is not linking. `ai-pp3` is GPL-2.0 and is read, never copied.)*
-Remaining before code: regenerate `neutral.pp3` from a 5.13 dump.
+The `ai-pp3` smoke test belongs to Phase 4 preparation, run right before the blind harness. It is
+not a gate on anything earlier.
 
-One pilot ran Aug 12–13 2026 outside this architecture and lost to the camera JPEG on two of three
-photographs. That result is why the architecture has its current shape.
+## How code gets written (Phases 1–2)
+
+Jorge writes the code. This is a Python learning project for the duration of Phases 1 and 2 — the
+goal is the appliance *and* the fluency, and trading the second away for speed is not a trade this
+project accepts.
+
+- **Claude does not write implementation modules.** No bulk-generated files, no "here is the whole
+  mapper, tweak it."
+- **Claude writes the skeleton, Jorge writes the bodies.** Module layout, imports, function
+  signatures, type hints, docstrings — then a single `TODO(human)` where the decision lives.
+- **One `TODO(human)` in the tree at a time.** It ships with the trade-offs stated and the answer
+  withheld.
+- **Claude may also write** test scaffolding, `.pp3` and config plumbing, throwaway measurement
+  scripts, and reviews.
+- **Explain before editing.** What the change does and why, before the tool call — read-only
+  commands included.
+- **Reviews are line-level and hands-off.** Name the line, name the idiom or the bug, explain why it
+  matters; Jorge makes the edit. Correct-but-unidiomatic still gets flagged.
+- Suspended only when Jorge says so explicitly, per file or per task.
 
 ## Verdict schema
 
@@ -94,29 +123,26 @@ The contract. Do not invent values outside these vocabularies.
 
 ## `neutral.pp3` is a reproducibility anchor
 
-The standardized preview profile must be a versioned file in this repo, not a description. Eval
-runs are only comparable if every preview was generated identically.
+The standardized preview profile is a versioned file in this repo, not a description. Eval runs
+are only comparable if every preview was generated identically.
 
-The committed file is an **87-line fragment, not renderer output** — RT 5.13 writes 872 lines. Every
-unstated setting silently inherits a version-dependent default, so the fragment cannot anchor
-anything. Regenerate from a `-O` dump; verified image-independent (two CR2s with different as-shot
-WB, 4336K and 4827K, produce byte-identical profiles).
+The committed file is a complete RawTherapee 5.13 `-O` dump (873 lines), so every setting is
+stated and no version-dependent default can leak in. It is image-independent: two CR2s with
+different as-shot white balance (4336K and 4827K) produce byte-identical profiles. Regenerate it
+from a `-O` dump, never by hand, whenever the pinned renderer changes.
 
-**Unclosed defects:**
+Settings the design depends on:
 
-- `ApplyLookTable`, `ApplyHueSatMap` and `HLRecovery` disagree between `neutral.pp3` and the render
-  template — blocked: the render template is not in this repo. Direction is a decision, not a
-  mechanical match; the `HLRecovery` divergence may be intentional, since the preview wants clipping
-  visible so the model can judge `highlights`.
-- **`[Resize]` is absent**, so previews render full-resolution. Decided Aug 23 2026: **512px long
-  edge** — marginally above the 300–500 the design note states.
+- `[Resize]` enabled, `LongEdge=512`, Lanczos. Previews are 512px on the long edge.
+- `ImageNum=0`. The field is zero-indexed.
+- `InputProfile=(cameraICC)`, written explicitly. RawTherapee ships no DCP or input ICC for the
+  Canon 2000D, so the four `[Color Management]` DCP switches (`ApplyLookTable`,
+  `ApplyHueSatMap`, `ApplyBaselineExposureOffset`, `Setting=Camera`) are inert on this body.
 
-**Closed Aug 23 2026, by measurement:**
-
-- `ImageNum=1` is harmless — differs from `ImageNum=0` by exactly the run-to-run noise floor. Set it
-  to `0` regardless; the field is zero-indexed.
-- `InputProfile` resolves to `(cameraICC)`, and RT ships no DCP or input ICC for the 2000D, so the
-  four `[Color Management]` DCP switches are inert on this body. Write the field explicitly.
+**Open:** `ApplyLookTable`, `ApplyHueSatMap` and `HLRecovery` may disagree between `neutral.pp3`
+and the production render template — blocked, the render template is not in this repo. Direction
+is a decision, not a mechanical match; the `HLRecovery` divergence may be intentional, since the
+preview wants clipping visible so the model can judge `highlights`.
 
 ## V3 label strength (constrains the Phase 4 log schema, not just Phase 5)
 
@@ -129,7 +155,7 @@ log for this from day one.
 
 # Project constraints
 
-Distilled from the design note. Source of truth for *why* is the Notion page; this file is the
+Distilled from the design page in Notion, which is the source of truth for *why*. This file is the
 set of rules that constrain what gets built.
 
 ## Priorities, in order
@@ -171,12 +197,11 @@ Two separate requirements:
 - **Output quality, judged perceptually.** A path is legal if its output is equivalently good, not
   if it is bit-exact. Rejection standard is a visible structured difference — seams, banding, lost
   detail — not a hash mismatch.
-- **Determinism, to a measured tolerance** (Aug 23 2026 — replaces "same bytes"). Same RAW + same
-  profile + same configuration + pinned renderer build → output within tolerance: **under 0.01% of
-  pixels differing, none by more than 8/255**. RT is not byte-identical multi-threaded (~150 of 24M
-  pixels, peak 4–6/255, confirmed invisible on direct inspection); `OMP_NUM_THREADS=1` fixes it at
-  1.37–1.47× the time and buys nothing perceptible, so all cores stay enabled. Provisional until
-  re-measured with denoise and sharpening enabled.
+- **Determinism, to a measured tolerance.** Same RAW + same profile + same configuration + pinned
+  renderer build → output within tolerance: **under 0.01% of pixels differing, none by more than
+  8/255**. Multi-threaded RawTherapee is not byte-identical but sits inside that tolerance, so all
+  cores stay enabled; do not force `OMP_NUM_THREADS=1`. Tolerance is provisional until re-measured
+  with denoise and sharpening enabled.
 
 Consequence: an **always**-tiled path is legal. A path that tiles **only when allocation fails** is
 illegal — output would vary with how much memory happened to be free.
@@ -258,26 +283,27 @@ of verdict quality.
   layer is the deliverable.
 - `.pp3` is an INI file — `configparser` with `optionxform = str`.
 - **No fixed-function ISP on the production render.** PiSP is preview-path only, if at all.
-- **`ai-pp3` is read, never imported.** GPL-2.0-only would foreclose permissive relicensing.
-  Calling `rawtherapee-cli` via subprocess is not linking and constrains nothing.
-- **Pin the renderer version.** Desktop and Pi must run the same RawTherapee build. Determinism is
-  specified against a *pinned renderer build*; two versions means eval measures a proxy. Pinned:
-  **5.13 official AppImage on both**, fetched by `setup.sh` via URL + sha256. `neutral.pp3` still
-  declares `AppVersion=5.10`; regenerate it from 5.13.
+- **`ai-pp3` is read, never imported.** It is GPL-2.0-only, which would foreclose permissive
+  relicensing. Calling `rawtherapee-cli` via subprocess is not linking and constrains nothing.
+- **Pinned renderer: RawTherapee 5.13 official AppImage, desktop and Pi.** Determinism is
+  specified against a *pinned renderer build*; two versions means eval measures a proxy. `setup.sh`
+  fetches by URL + sha256. Changing the pin invalidates every prior eval number and requires
+  regenerating `neutral.pp3`.
 
 ## Hardware and concurrency
 
 - Reference: **Pi 5 4GB, no accelerator, hosted picker, V1 fallback.** The 8GB purchase question is
-  **closed** — it buys 22–29%, minutes on a full card. Do not reopen without a new argument.
+  **closed** — it buys minutes on a full card. Do not reopen without a new argument.
 - Leading configuration: **1 process × 4 threads, `RgbDenoiseThreadLimit=0`.** Desktop-measured;
   the Pi decides.
-- **Two operating modes, both producing byte-identical JPEGs.** Field (default, power-bank): 1×2,
-  9.10 s/photo, conservative governor. Bench (mains): 1×4, 6.72 s/photo. **Justify the modes on
-  peak current, not on speed** — the gap is ~1.3×, not the ~3× once claimed. If the Phase 3 power
-  test shows no meaningful peak-draw difference, collapsing to one mode is the right call.
+- **Two operating modes, both producing JPEGs within the determinism tolerance.** Field (default,
+  power-bank): 1×2, conservative governor. Bench (mains): 1×4. **Justify the modes on peak
+  current, not on speed** — the speed gap is small. If the Phase 3 power test shows no meaningful
+  peak-draw difference, collapse to one mode.
 - **No hardcoded hardware configuration.** Per-process memory varies with megapixels and profile.
   Probe the first render, read actual peak RSS, size workers from the remaining budget.
-- **Probe at the thread count the workers will actually use.** Denoise threads cost ~317MB each.
+- **Probe at the thread count the workers will actually use.** Each denoise thread costs hundreds
+  of MB.
 - **If swap moves off zero at all, the configuration failed.** Completing while thrashing an SD
   card is worse than useless.
 - **Power mode is a manual toggle** (PMIC undervoltage as a safety net only) — a wrong auto-guess
@@ -306,8 +332,7 @@ processing cannot fix.
 
 ## Epistemic rules
 
-The note's recurring failure mode is plausible reasoning stated as fact. These are corrections to
-that.
+This project's recurring failure mode is plausible reasoning stated as fact.
 
 - **Label measured vs guessed.** An estimate must never drift into being treated as data.
 - **Off-board measurements are provisional.** The Pi decides the architecture.
@@ -322,14 +347,8 @@ that.
 - **Preview representation freeze.** V2's logs *are* V3's training set. Either freeze the preview
   before logging starts or store a stable RAW path + hash per label. Must be decided before Phase 4.
 - **`ai-pp3` as Baseline A** in the Phase 4 blind comparison.
-- **`ApplyHueSatMap` classification** — probably calibration, not aesthetic. Currently disabled on
-  the aesthetic reading.
-- **What "neutral" means — one question with four faces.** Per-camera *calibration* applied
-  deterministically is the invariant working, **not** violating it — a single fixed matrix across
-  sensors makes camera identity more visible, per the Aug 13 correction. So the question is not
-  "remove the camera dependence" but "which parts of the DCP are calibration and which are
-  aesthetic," and it is the same question as `ApplyHueSatMap`, `ApplyBaselineExposureOffset=true`
-  and `Setting=Camera`. One coherent answer should settle all four. **Measured Aug 23 2026:**
-  `InputProfile` resolves to `(cameraICC)` and no DCP exists for the 2000D, so all four switches are
-  inert here and the question has **no observable effect on this body**. It becomes live only on a
-  camera RT actually profiles — decide it then, with something to measure.
+- **Which parts of the DCP are calibration and which are aesthetic.** One question behind four
+  switches: `ApplyLookTable`, `ApplyHueSatMap` (probably calibration; currently disabled on the
+  aesthetic reading), `ApplyBaselineExposureOffset`, `Setting=Camera`. Answer it once, for all four.
+  All four are inert on this body, which has no DCP — decide it on a camera RawTherapee actually
+  profiles, with something to measure.
