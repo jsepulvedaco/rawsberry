@@ -22,11 +22,18 @@ lives in git and the Decision Log.
 - Epistemic labels about *now* stay: measured, guessed, provisional, blocked, open.
 - Test per sentence: if the reader never saw an earlier version of this file, does the sentence
   still carry information? If not, delete it.
+- **CLAUDE.md constrains, README explains.** Where they overlap, CLAUDE.md is canonical and README
+  follows. On conflict, fix README.
+- Identical in content in both: the pipeline line, the verdict schema, the scope list. When either
+  file changes, diff those three against the other before committing.
 
 ## End of a session
 
 Before wrapping up a working session or discussion, ask whether anything needs adding to the
 Backlog or the Decision Log.
+
+Before editing a factual claim in README or CLAUDE.md, check it against the Backlog cards. Every
+stale claim so far entered from memory of a conversation, not from the record.
 
 ## Git
 
@@ -65,13 +72,14 @@ implementations of it, not layers. Nothing downstream knows which one answered.
 
 ## Phase
 
-**Phase 1, not started.** Design is done; there are zero lines of pipeline code. Nothing remains
-before code. The next action is the bootstrap loop — V1 verdicts → mapper → generated `.pp3` →
+**Phase 1, not started.** The architecture is fixed; the items under *Open decisions* are not.
+There are zero lines of pipeline code and nothing remains before code. The next action is the bootstrap loop — V1 verdicts → mapper → generated `.pp3` →
 `rawtherapee-cli` → JPEG, with **guessed** constants. Calibration is separate work and is not in
 the build order.
 
-The `ai-pp3` smoke test belongs to Phase 4 preparation, run right before the blind harness. It is
-not a gate on anything earlier.
+`ai-pp3` is an existing open-source tool that has a VLM emit `.pp3` values directly — the approach
+this project rejects — and serves as a comparison baseline. Its smoke test belongs to Phase 4
+preparation, run right before the blind harness. It is not a gate on anything earlier.
 
 ## How code gets written (Phases 1–2)
 
@@ -133,16 +141,19 @@ from a `-O` dump, never by hand, whenever the pinned renderer changes.
 
 Settings the design depends on:
 
-- `[Resize]` enabled, `LongEdge=512`, Lanczos. Previews are 512px on the long edge.
+- `[Resize]` enabled, `LongEdge=512`, Lanczos. Previews are 512px on the long edge. Measured on
+  the desktop: at this size repeat renders are byte-identical even multi-threaded, so the
+  model-input path is fully deterministic — stronger than the production tolerance below.
 - `ImageNum=0`. The field is zero-indexed.
 - `InputProfile=(cameraICC)`, written explicitly. RawTherapee ships no DCP or input ICC for the
   Canon 2000D, so the four `[Color Management]` DCP switches (`ApplyLookTable`,
   `ApplyHueSatMap`, `ApplyBaselineExposureOffset`, `Setting=Camera`) are inert on this body.
 
-**Open:** `ApplyLookTable`, `ApplyHueSatMap` and `HLRecovery` may disagree between `neutral.pp3`
-and the production render template — blocked, the render template is not in this repo. Direction
-is a decision, not a mechanical match; the `HLRecovery` divergence may be intentional, since the
-preview wants clipping visible so the model can judge `highlights`.
+**Open, Phase 1:** the mapper generates the production `.pp3` from a base profile, and that base
+may legitimately differ from `neutral.pp3` on `ApplyLookTable`, `ApplyHueSatMap` and
+`HLRecovery`. Direction is a decision inside the bootstrap loop, not a mechanical match. The first
+two are inert on this body — set them by principle. `HLRecovery` likely diverges on purpose: off in
+the preview so clipping stays visible for the `highlights` verdict, on in production.
 
 ## V3 label strength (constrains the Phase 4 log schema, not just Phase 5)
 
@@ -199,16 +210,17 @@ Two separate requirements:
   detail — not a hash mismatch.
 - **Determinism, to a measured tolerance.** Same RAW + same profile + same configuration + pinned
   renderer build → output within tolerance: **under 0.01% of pixels differing, none by more than
-  8/255**. Multi-threaded RawTherapee is not byte-identical but sits inside that tolerance, so all
-  cores stay enabled; do not force `OMP_NUM_THREADS=1`. Tolerance is provisional until re-measured
-  with denoise and sharpening enabled.
+  8/255**. Measured on the desktop with `neutral.pp3`, all cores: 0.0006% and 6/255; the tolerance
+  is that with headroom, not the measurement itself. Multi-threaded RawTherapee is not
+  byte-identical but sits inside it, so all cores stay enabled; do not force `OMP_NUM_THREADS=1`.
+  Provisional until re-measured with denoise and sharpening enabled, and on the Pi.
 
 Consequence: an **always**-tiled path is legal. A path that tiles **only when allocation fails** is
 illegal — output would vary with how much memory happened to be free.
 
-Open: if the mapper is calibrated on the desktop and shipped on the Pi, those are two different
-renderer builds and eval measures a proxy. Decide whether eval runs on the board *before*
-calibration, not after.
+Open, pending measurement: desktop and Pi run the same release built for different architectures.
+Cross-machine drift is unmeasured. Decision rule: if Pi output lands outside the tolerance of
+desktop output, eval runs on the board *before* calibration; otherwise desktop eval stands.
 
 ## Camera-agnostic invariant
 
@@ -292,8 +304,8 @@ of verdict quality.
 
 ## Hardware and concurrency
 
-- Reference: **Pi 5 4GB, no accelerator, hosted picker, V1 fallback.** The 8GB purchase question is
-  **closed** — it buys minutes on a full card. Do not reopen without a new argument.
+- Reference: **Pi 5 4GB, no accelerator, hosted picker, V1 fallback.** 8GB buys minutes on a full
+  card, nothing architectural; do not revisit without a new argument.
 - Leading configuration: **1 process × 4 threads, `RgbDenoiseThreadLimit=0`.** Desktop-measured;
   the Pi decides.
 - **Two operating modes, both producing JPEGs within the determinism tolerance.** Field (default,

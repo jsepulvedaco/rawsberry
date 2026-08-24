@@ -6,7 +6,7 @@ The goal is not to make editing faster. It is to remove the step.
 
 ## Status
 
-Design complete. **No pipeline code exists yet.** Nothing in this repository runs a photo through the pipeline.
+Architecture fixed; several design decisions still open (listed in `CLAUDE.md`). **No pipeline code exists yet.** Nothing in this repository runs a photo through the pipeline.
 
 What exists:
 
@@ -14,7 +14,7 @@ What exists:
 - `neutral.pp3`, the standardized preview profile.
 - `setup.sh`, which provisions the Pi.
 
-One pilot was run outside this architecture — a vision model emitting RawTherapee profile values directly. On three photographs the camera's own JPEG was preferred on two. That result is why the architecture below has the shape it does.
+The kill criterion — blind preference over the camera's own JPEG — has zero clean data points. No valid comparison has been run.
 
 The only camera anything has been checked against is a Canon EOS 2000D shooting CR2. The design is camera-model agnostic; the reality so far is one body.
 
@@ -27,11 +27,14 @@ The only camera anything has been checked against is a Canon EOS 2000D shooting 
 | `raws/` | Input RAW files. Gitignored; you supply them. Never written to. |
 | `out/` | Rendered JPEGs. Gitignored. |
 | `CLAUDE.md` | Project rules and constraints for the coding agent. |
+| `AGENTS.md` | Pointer to `CLAUDE.md` for agents that read that filename instead. |
+| `.claude/skills/` | Agent skills specific to this project. |
+| `LICENSE` | MIT. |
 
 ## Architecture
 
 ```
-SD reader → phone web UI → SettingsPicker → deterministic mapper → RawTherapee → JPEG → feedback log
+SD card → phone web UI → SettingsPicker → deterministic mapper → .pp3 → rawtherapee-cli → JPEG → feedback log
 ```
 
 Two ideas carry the design.
@@ -46,6 +49,8 @@ setting = f(measured current state, target selected by verdict)
 
 Two photographs receiving the same verdict get different numbers because they start in different places.
 
+The targets each verdict selects are constants, calibrated offline from preference — sweep values across a development set once, fit the inverse, ship a lookup. Phase 1 runs on guessed constants to get the loop working; calibration is separate, later work and the least-examined part of the design.
+
 The vocabulary, in full:
 
 | Dimension | Values |
@@ -59,7 +64,7 @@ The vocabulary, in full:
 | `saturation` | vivid · natural · muted |
 | `tone_profile` | neutral · punchy · soft |
 
-The split makes every failure diagnosable: wrong verdict is a prompt problem, wrong number is a mapper bug. Vision models judge scenes well and calibrate quantities badly.
+The split makes every failure diagnosable: wrong verdict is a prompt problem, wrong number is a mapper bug. The premise the design bets on, unmeasured here: vision models judge scenes well and calibrate quantities badly.
 
 ### Camera-agnostic invariant
 
@@ -91,7 +96,7 @@ RawTherapee CLI owns demosaicing, camera colour handling, tone and colour proces
 
 ### Renderer pin
 
-Both machines run **RawTherapee 5.13** from the official upstream Linux AppImage, not from a distro package. 5.13 is the first release with an official arm64 build, so desktop and Pi run the same binary. Determinism is specified against this pinned build; numbers taken on two different builds are not comparable, and changing the pin means regenerating `neutral.pp3` and discarding prior eval numbers.
+Both machines run **RawTherapee 5.13** from the official upstream Linux AppImages, not from a distro package. 5.13 is the first release with an official arm64 build, so desktop and Pi run the same release — built per architecture, so not the same binary; whether the two drift outside the determinism tolerance is unmeasured. Determinism is specified against this pinned release; numbers taken on two different releases are not comparable, and changing the pin means regenerating `neutral.pp3` and discarding prior eval numbers.
 
 Assets from `https://github.com/RawTherapee/RawTherapee/releases/tag/5.13`:
 
@@ -151,12 +156,12 @@ The appliance should fail by being boring, never by being wrong.
 6. **Phase 6** — exposure bracketing and fusion.
 7. **Phase 7** — semantic local adjustment. Speculative, unbuilt.
 
-Out of scope, permanently: cropping, astrophotography, arbitrary masking.
+Out of scope, permanently: cropping, astrophotography, arbitrary external raster masks, true semantic masking in `.pp3`. RawTherapee cannot take an external mask, and its own colour-range selection is judged too unreliable to run unattended (unmeasured). Phase 7 semantic local adjustment, if it happens, is designed to run outside the renderer: segmentation on the preview, compositing of RawTherapee's output downstream.
 
 ## Requirements
 
 - RawTherapee 5.13 (`rawtherapee-cli`), pinned as above
-- Python 3.11+
+- Python 3.11+, for the pipeline once it exists
 
 ## License
 
