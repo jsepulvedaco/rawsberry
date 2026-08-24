@@ -55,10 +55,11 @@ implementations of it, not layers. Nothing downstream knows which one answered.
 the bootstrap loop — V1 verdicts → mapper → generated `.pp3` → `rawtherapee-cli` → JPEG, with
 **guessed** constants. Calibration is separate work and is not in the build order.
 
-Gating it: confirm what `InputProfile` RawTherapee actually resolves. The `ai-pp3` smoke test is
-**not** a gate — moved to Phase 4 preparation Aug 20 2026, run right before the blind harness.
-*(RawTherapee's licence version is not a gate either — subprocess invocation is not linking.
-`ai-pp3` is GPL-2.0 and is read, never copied.)*
+**Gate cleared Aug 23 2026** — the `InputProfile` question is measured and closed (see
+`neutral.pp3` below). The `ai-pp3` smoke test is **not** a gate: moved to Phase 4 preparation
+Aug 20 2026, run right before the blind harness. *(RawTherapee's licence version is not a gate
+either — subprocess invocation is not linking. `ai-pp3` is GPL-2.0 and is read, never copied.)*
+Remaining before code: regenerate `neutral.pp3` from a 5.13 dump.
 
 One pilot ran Aug 12–13 2026 outside this architecture and lost to the camera JPEG on two of three
 photographs. That result is why the architecture has its current shape.
@@ -96,15 +97,26 @@ The contract. Do not invent values outside these vocabularies.
 The standardized preview profile must be a versioned file in this repo, not a description. Eval
 runs are only comparable if every preview was generated identically.
 
+The committed file is an **87-line fragment, not renderer output** — RT 5.13 writes 872 lines. Every
+unstated setting silently inherits a version-dependent default, so the fragment cannot anchor
+anything. Regenerate from a `-O` dump; verified image-independent (two CR2s with different as-shot
+WB, 4336K and 4827K, produce byte-identical profiles).
+
 **Unclosed defects:**
 
 - `ApplyLookTable`, `ApplyHueSatMap` and `HLRecovery` disagree between `neutral.pp3` and the render
-  template — reconcile before the next pilot round.
-- **`[Resize]` is absent**, so previews render full-resolution. "Fixed resize and normalization,
-  identical for every camera" is specified but not implemented.
-- **`ImageNum=1`** where RT's default is `0` and the field is zero-indexed. Unverified. Test:
-  render with `ImageNum=0` and compare md5 — identical means harmless, different means every render
-  from this template is suspect.
+  template — blocked: the render template is not in this repo. Direction is a decision, not a
+  mechanical match; the `HLRecovery` divergence may be intentional, since the preview wants clipping
+  visible so the model can judge `highlights`.
+- **`[Resize]` is absent**, so previews render full-resolution. Decided Aug 23 2026: **512px long
+  edge** — marginally above the 300–500 the design note states.
+
+**Closed Aug 23 2026, by measurement:**
+
+- `ImageNum=1` is harmless — differs from `ImageNum=0` by exactly the run-to-run noise floor. Set it
+  to `0` regardless; the field is zero-indexed.
+- `InputProfile` resolves to `(cameraICC)`, and RT ships no DCP or input ICC for the 2000D, so the
+  four `[Color Management]` DCP switches are inert on this body. Write the field explicitly.
 
 ## V3 label strength (constrains the Phase 4 log schema, not just Phase 5)
 
@@ -159,9 +171,12 @@ Two separate requirements:
 - **Output quality, judged perceptually.** A path is legal if its output is equivalently good, not
   if it is bit-exact. Rejection standard is a visible structured difference — seams, banding, lost
   detail — not a hash mismatch.
-- **Determinism, hard.** Same RAW + same profile + same configuration + pinned renderer build on a
-  defined execution environment → same bytes. The eval harness, blind comparisons, V3's training
-  previews and mapper regression tests all depend on it.
+- **Determinism, to a measured tolerance** (Aug 23 2026 — replaces "same bytes"). Same RAW + same
+  profile + same configuration + pinned renderer build → output within tolerance: **under 0.01% of
+  pixels differing, none by more than 8/255**. RT is not byte-identical multi-threaded (~150 of 24M
+  pixels, peak 4–6/255, confirmed invisible on direct inspection); `OMP_NUM_THREADS=1` fixes it at
+  1.37–1.47× the time and buys nothing perceptible, so all cores stay enabled. Provisional until
+  re-measured with denoise and sharpening enabled.
 
 Consequence: an **always**-tiled path is legal. A path that tiles **only when allocation fails** is
 illegal — output would vary with how much memory happened to be free.
@@ -309,11 +324,12 @@ that.
 - **`ai-pp3` as Baseline A** in the Phase 4 blind comparison.
 - **`ApplyHueSatMap` classification** — probably calibration, not aesthetic. Currently disabled on
   the aesthetic reading.
-- **What "neutral" means — one question with four faces.** `InputProfile` is absent from
-  `neutral.pp3`, so RT resolves a default (believed to be the camera-matched DCP; unverified, an
-  `-O` dump settles it). Note that per-camera *calibration* applied deterministically is the
-  invariant working, **not** violating it — a single fixed matrix across sensors makes camera
-  identity more visible, per the Aug 13 correction. So the open question is not "remove the camera
-  dependence" but "which parts of the DCP are calibration and which are aesthetic." That is the same
-  question as `ApplyHueSatMap`, as `ApplyBaselineExposureOffset=true`, and as `Setting=Camera`. One
-  coherent answer should settle all four. Not resolved as of Aug 21 2026.
+- **What "neutral" means — one question with four faces.** Per-camera *calibration* applied
+  deterministically is the invariant working, **not** violating it — a single fixed matrix across
+  sensors makes camera identity more visible, per the Aug 13 correction. So the question is not
+  "remove the camera dependence" but "which parts of the DCP are calibration and which are
+  aesthetic," and it is the same question as `ApplyHueSatMap`, `ApplyBaselineExposureOffset=true`
+  and `Setting=Camera`. One coherent answer should settle all four. **Measured Aug 23 2026:**
+  `InputProfile` resolves to `(cameraICC)` and no DCP exists for the 2000D, so all four switches are
+  inert here and the question has **no observable effect on this body**. It becomes live only on a
+  camera RT actually profiles — decide it then, with something to measure.
