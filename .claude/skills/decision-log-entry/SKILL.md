@@ -55,6 +55,31 @@ Use bold inline labels (`**Consequences:**`, `**Retracted:**`, `**Unverified:**`
 long paragraph, matching the existing entries. Do not use headings or bullet lists — the page is
 a run of paragraphs.
 
+## Propagation — required before the entry is posted
+
+Every stale claim this project has accumulated came from a decision being recorded where the
+conversation happened and nowhere else. The log entry is the one place every decision passes
+through, so the check belongs here.
+
+Before posting, name every place the old claim currently lives: `CLAUDE.md`, `README.md`, the
+project root page, other Notion pages, other Backlog cards. Search for it rather than recalling
+it — the claim is usually phrased differently in each place.
+
+Then, in the same session:
+
+- **Repo files** — make the edit. A decision that leaves `CLAUDE.md` contradicting the log is not
+  finished.
+- **Notion prose pages** — make the edit, stating only what is now true. No dated correction, no
+  strikethrough, no "revised" marker. That is what the log entry is for.
+- **Anything you cannot reach** — a Backlog card naming the file and the exact claim to fix.
+
+Two writers reach this project: sessions with the repo, and the Claude app with Notion only. The
+app cannot edit the repo, so a card is its only channel to it. When a decision arrives from that
+side, expect the repo half to be undone.
+
+Do not list the propagation in the entry itself — that is housekeeping. It is a precondition for
+posting, not content.
+
 ## Length
 
 One paragraph. Write it, then cut.
