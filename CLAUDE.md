@@ -55,9 +55,10 @@ implementations of it, not layers. Nothing downstream knows which one answered.
 the bootstrap loop — V1 verdicts → mapper → generated `.pp3` → `rawtherapee-cli` → JPEG, with
 **guessed** constants. Calibration is separate work and is not in the build order.
 
-Gating it: confirm what `InputProfile` RawTherapee actually resolves, then the `ai-pp3` smoke test.
-*(RawTherapee's licence version is not a gate — subprocess invocation is not linking. `ai-pp3` is
-GPL-2.0 and is read, never copied.)*
+Gating it: confirm what `InputProfile` RawTherapee actually resolves. The `ai-pp3` smoke test is
+**not** a gate — moved to Phase 4 preparation Aug 20 2026, run right before the blind harness.
+*(RawTherapee's licence version is not a gate either — subprocess invocation is not linking.
+`ai-pp3` is GPL-2.0 and is read, never copied.)*
 
 One pilot ran Aug 12–13 2026 outside this architecture and lost to the camera JPEG on two of three
 photographs. That result is why the architecture has its current shape.
@@ -245,10 +246,9 @@ of verdict quality.
 - **`ai-pp3` is read, never imported.** GPL-2.0-only would foreclose permissive relicensing.
   Calling `rawtherapee-cli` via subprocess is not linking and constrains nothing.
 - **Pin the renderer version.** Desktop and Pi must run the same RawTherapee build. Determinism is
-  specified against a *pinned renderer build*; two versions means eval measures a proxy. Currently
-  **5.10 desktop / 5.11 Pi — unresolved**, and `setup.sh` does a bare `apt install rawtherapee`,
-  which will keep them drifting. `neutral.pp3` declares `AppVersion=5.10`; regenerate it from
-  whichever version wins.
+  specified against a *pinned renderer build*; two versions means eval measures a proxy. Pinned:
+  **5.13 official AppImage on both**, fetched by `setup.sh` via URL + sha256. `neutral.pp3` still
+  declares `AppVersion=5.10`; regenerate it from 5.13.
 
 ## Hardware and concurrency
 
